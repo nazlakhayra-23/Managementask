@@ -1,0 +1,192 @@
+<?php
+
+include "db.php";
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit;
+}
+$pageTitle = "My Tasks | Task Manager";
+
+include "header.php";
+
+$user_id = $_SESSION['user_id'];
+
+// --- Ambil options untuk dropdown (category & priority) ---
+$cats_q = mysqli_prepare($koneksi, "SELECT id, name FROM categories WHERE user_id = ? ORDER BY name");
+mysqli_stmt_bind_param($cats_q, "i", $user_id);
+mysqli_stmt_execute($cats_q);
+$cats_res = mysqli_stmt_get_result($cats_q);
+
+$prs_q = mysqli_prepare($koneksi, "SELECT id, level FROM priorities WHERE user_id = ? ORDER BY weight DESC");
+mysqli_stmt_bind_param($prs_q, "i", $user_id);
+mysqli_stmt_execute($prs_q);
+$prs_res = mysqli_stmt_get_result($prs_q);
+
+// --- Ambil parameter dari GET ---
+$search = trim($_GET['search'] ?? '');
+$filter_cat = isset($_GET['category']) && $_GET['category'] !== '' ? intval($_GET['category']) : null;
+$filter_pr = isset($_GET['priority']) && $_GET['priority'] !== '' ? intval($_GET['priority']) : null;
+
+// --- Bangun query berdasarkan kondisi (menghindari dynamic bind complexity) ---
+$base_sql = "SELECT t.*, c.name AS category, p.level AS priority
+             FROM tasks t
+             LEFT JOIN categories c ON t.category_id = c.id
+             LEFT JOIN priorities p ON t.priority_id = p.id
+             WHERE t.user_id = ?";
+
+$params = [];
+$types = "i";
+$params[] = $user_id;
+
+if ($filter_cat !== null) {
+    $base_sql .= " AND t.category_id = ?";
+    $types .= "i";
+    $params[] = $filter_cat;
+}
+
+if ($filter_pr !== null) {
+    $base_sql .= " AND t.priority_id = ?";
+    $types .= "i";
+    $params[] = $filter_pr;
+}
+
+if ($search !== '') {
+    // add two LIKE params
+    $base_sql .= " AND (t.title LIKE CONCAT('%', ?, '%') OR t.description LIKE CONCAT('%', ?, '%'))";
+    $types .= "ss";
+    $params[] = $search;
+    $params[] = $search;
+}
+
+$base_sql .= " ORDER BY t.created_at DESC";
+
+// Now prepare and bind depending on number of params using a simple helper:
+$stmt = mysqli_prepare($koneksi, $base_sql);
+if (!$stmt) {
+    die("Prepare failed: " . mysqli_error($koneksi));
+}
+
+// bind manually because count small — build binding call
+switch (count($params)) {
+    case 1:
+        mysqli_stmt_bind_param($stmt, $types, $params[0]);
+        break;
+    case 2:
+        mysqli_stmt_bind_param($stmt, $types, $params[0], $params[1]);
+        break;
+    case 3:
+        mysqli_stmt_bind_param($stmt, $types, $params[0], $params[1], $params[2]);
+        break;
+    case 4:
+        mysqli_stmt_bind_param($stmt, $types, $params[0], $params[1], $params[2], $params[3]);
+        break;
+    case 5:
+        mysqli_stmt_bind_param($stmt, $types, $params[0], $params[1], $params[2], $params[3], $params[4]);
+        break;
+    default:
+        // no bind (shouldn't happen), but safe fallback
+        break;
+}
+
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
+?>
+
+<?php // Flash message display (session flash system) ?>
+<?php if (isset($_SESSION['flash_msg'])): ?>
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    <?= htmlspecialchars($_SESSION['flash_msg']) ?>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+  <?php unset($_SESSION['flash_msg']); ?>
+<?php endif; ?>
+
+<!-- Header + filter UI -->
+<div class="d-flex justify-content-between align-items-center mb-3" style="gap:10px;">
+  <h1 class="mb-0"><i class="bi bi-journal-check"></i> Daftar Tugas</h1>
+
+  <form method="GET" class="d-flex align-items-center" style="gap:8px;">
+    <input type="text" name="search" class="form-control" placeholder="Cari tugas..." value="<?= htmlspecialchars($search) ?>" style="min-width:200px;">
+    
+    <select name="category" class="form-select">
+      <option value="">All Categories</option>
+      <?php
+      // we need to re-loop categories result — fetch into array first
+      mysqli_data_seek($cats_res, 0);
+      while ($c = mysqli_fetch_assoc($cats_res)): ?>
+        <option value="<?= $c['id'] ?>" <?= ($filter_cat === intval($c['id'])) ? 'selected' : '' ?>>
+          <?= htmlspecialchars($c['name']) ?>
+        </option>
+      <?php endwhile; ?>
+    </select>
+
+    <select name="priority" class="form-select">
+      <option value="">All Priorities</option>
+      <?php
+      mysqli_data_seek($prs_res, 0);
+      while ($p = mysqli_fetch_assoc($prs_res)): ?>
+        <option value="<?= $p['id'] ?>" <?= ($filter_pr === intval($p['id'])) ? 'selected' : '' ?>>
+          <?= htmlspecialchars($p['level']) ?>
+        </option>
+      <?php endwhile; ?>
+    </select>
+
+    <button type="submit" class="btn btn-outline-primary"><i class="bi bi-search"></i></button>
+    <a href="tasks.php" class="btn btn-outline-secondary">Reset</a>
+  </form>
+
+  <a href="add_task.php" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Tambah</a>
+</div>
+
+<!-- Tasks table -->
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>ID</th>
+            <th>Title</th>
+            <th>Description</th>
+            <th>Categories</th>
+            <th>Priorities</th>
+            <th>Created</th>
+            <th>Status</th>
+            <th class="text-end">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php if (mysqli_num_rows($result) == 0): ?>
+            <tr><td colspan="8" class="text-center py-4 text-muted">Belum ada tugas.</td></tr>
+          <?php endif; ?>
+
+          <?php while ($row = mysqli_fetch_assoc($result)): ?>
+            <tr>
+              <td><?= $row['id'] ?></td>
+              <td><?= htmlspecialchars($row['title']) ?></td>
+              <td style="max-width:320px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><?= htmlspecialchars($row['description']) ?></td>
+              <td><?= htmlspecialchars($row['category'] ?? '-') ?></td>
+              <td><?= htmlspecialchars($row['priority'] ?? '-') ?></td>
+              <td><?= $row['created_at'] ?></td>
+              <td>
+                <?php if($row['status'] == 'done'): ?>
+                  <span class="badge bg-success">Done</span>
+                <?php else: ?>
+                  <span class="badge bg-secondary">Pending</span>
+                <?php endif; ?>
+              </td>
+              <td class="text-end">
+                <a href="edit_task.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
+                <a href="toggle_status.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-success" title="Mark Done / Undo"><i class="bi bi-check2-circle"></i></a>
+                <a href="delete_task.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Yakin mau menghapus tugas ini?')"><i class="bi bi-trash"></i></a>
+              </td>
+            </tr>
+          <?php endwhile; ?>
+
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<?php include "footer.php"; ?>

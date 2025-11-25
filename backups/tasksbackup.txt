@@ -1,0 +1,110 @@
+<?php
+include "db.php";
+if (!isset($_SESSION['user_id'])) {
+    // kalau belum login, langsung ke login.php
+    header("Location: login.php");
+    exit;
+}
+include "header.php";
+
+// ambil pesan jika ada
+$msg = $_GET['msg'] ?? null;
+
+// ambil semua task
+$search = $_GET['search'] ?? '';
+
+if ($search) {
+    // Kalau ada kata yang dicari, filter hasil
+    $stmt = mysqli_prepare($koneksi, 
+      "SELECT * FROM tasks 
+       WHERE title LIKE CONCAT('%', ?, '%') 
+       OR description LIKE CONCAT('%', ?, '%') 
+       ORDER BY created_at DESC");
+    mysqli_stmt_bind_param($stmt, "ss", $search, $search);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+} else {
+    // Kalau kosong, tampilkan semua
+    $result = mysqli_query($koneksi, "SELECT * FROM tasks ORDER BY created_at DESC");
+}
+
+?>
+<?php if($msg): ?>
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    <?= htmlspecialchars($msg) ?>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+<?php endif; ?>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="mb-0"><i class="bi bi-journal-check"></i> Daftar Tugas</h1>
+
+  <form method="GET" class="d-flex" style="gap:8px;">
+    <input type="text" name="search" class="form-control" placeholder="Cari tugas..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>">
+    <button type="submit" class="btn btn-outline-primary"><i class="bi bi-search"></i></button>
+  </form>
+
+  <a href="add_task.php" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Tambah</a>
+</div>
+
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th style="width:60px">ID</th>
+            <th>Judul</th>
+            <th style="width:36%">Deskripsi</th>
+            <th style="width:120px">Created</th>
+            <th style="width:120px">Status</th>
+            <th class="text-end" style="width:160px">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php if(mysqli_num_rows($result) == 0): ?>
+            <tr>
+              <td colspan="6" class="text-center py-4 text-muted">Belum ada tugas. <a href="add_task.php">Tambah tugas</a></td>
+            </tr>
+          <?php endif; ?>
+
+          <?php while($row = mysqli_fetch_assoc($result)): ?>
+            <tr>
+              <td><?= $row['id'] ?></td>
+              <td><?= htmlspecialchars($row['title']) ?></td>
+              <td style="max-width:520px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><?= htmlspecialchars($row['description']) ?></td>
+              <td><?= $row['created_at'] ?></td>
+              <td>
+              <span class="badge <?= $row['status']=='done' ? 'badge-done' : 'badge-pending' ?>">
+              <?= ucfirst($row['status']) ?>
+              </span>
+              </td>
+
+              <td class="text-end">
+                <a href="edit_task.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
+                <a href="toggle_status.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-success" title="Mark Done / Undo"><i class="bi bi-check2-circle"></i></a>
+                <a href="delete_task.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Yakin mau menghapus tugas ini?')" title="Delete"><i class="bi bi-trash"></i></a>
+              </td>
+            </tr>
+          <?php endwhile; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// Auto-hide alert setelah 3 detik
+setTimeout(() => {
+  const alert = document.querySelector('.alert');
+  if (alert) {
+    alert.classList.remove('show');
+    alert.classList.add('fade');
+    setTimeout(() => alert.remove(), 500);
+  }
+}, 3000);
+</script>
+
+
+<?php include "footer.php"; ?>

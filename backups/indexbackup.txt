@@ -1,0 +1,67 @@
+<?php
+// index.php - Dashboard / Home
+include "db.php";
+
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit;
+}
+
+$pageTitle = "Dashboard | Task Manager";
+
+include "header.php";
+
+$user_id = $_SESSION['user_id'];
+
+// Ambil statistik sederhana
+$stmt = mysqli_prepare($koneksi, "
+    SELECT 
+      (SELECT COUNT(*) FROM tasks WHERE user_id = ?) AS total,
+      (SELECT COUNT(*) FROM tasks WHERE user_id = ? AND status='pending') AS pending,
+      (SELECT COUNT(*) FROM tasks WHERE user_id = ? AND status='done') AS done
+");
+mysqli_stmt_bind_param($stmt, "iii", $user_id, $user_id, $user_id);
+mysqli_stmt_execute($stmt);
+$res = mysqli_stmt_get_result($stmt);
+$stats = mysqli_fetch_assoc($res);
+mysqli_stmt_close($stmt);
+?>
+
+<div class="container py-5">
+  <h1 class="mb-4">👋 Welcome, <?= htmlspecialchars($_SESSION['username']) ?></h1>
+
+  <div class="row g-4 mb-4">
+    <div class="col-md-4">
+      <div class="card text-center shadow-sm border-0 bg-primary text-white">
+        <div class="card-body">
+          <h5>Total Tasks</h5>
+          <div class="display-5 fw-bold"><?= $stats['total'] ?></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card text-center shadow-sm border-0 bg-warning text-dark">
+        <div class="card-body">
+          <h5>Pending</h5>
+          <div class="display-5 fw-bold"><?= $stats['pending'] ?></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card text-center shadow-sm border-0 bg-success text-white">
+        <div class="card-body">
+          <h5>Done</h5>
+          <div class="display-5 fw-bold"><?= $stats['done'] ?></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex gap-3">
+    <a href="tasks.php" class="btn btn-primary"><i class="bi bi-list-task"></i> View Tasks</a>
+    <a href="manage_categories.php" class="btn btn-outline-secondary"><i class="bi bi-folder2-open"></i> Manage Categories</a>
+    <a href="manage_priorities.php" class="btn btn-outline-secondary"><i class="bi bi-lightning-charge"></i> Manage Priorities</a>
+  </div>
+</div>
+
+<?php include "footer.php"; ?>

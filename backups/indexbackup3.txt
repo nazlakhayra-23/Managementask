@@ -1,0 +1,141 @@
+<?php
+// index.php - mini dashboard / landing (functional)
+include "db.php"; // db.php harus memanggil session_start() dan membuat $koneksi
+
+$pageTitle = "Welcome | Task Manager";
+include "header.php";
+?>
+
+<?php if (!isset($_SESSION['user_id'])): ?>
+  <!-- Guest landing -->
+  <div class="py-5 text-center">
+    <h1 class="display-5">📘 TaskManager</h1>
+    <p class="lead">Simple personal task manager — CRUD tasks, categories, priorities, notes.</p>
+    <div class="mt-4 d-flex justify-content-center gap-3">
+      <a href="login.php" class="btn btn-primary btn-lg">Login</a>
+      <a href="register.php" class="btn btn-outline-secondary btn-lg">Register</a>
+      <a href="tasks.php" class="btn btn-link btn-lg">Explore (demo)</a>
+    </div>
+  </div>
+
+<?php else: ?>
+  <?php
+  $user_id = $_SESSION['user_id'];
+
+  // counts: total, pending, done
+  $c1 = mysqli_prepare($koneksi, "SELECT COUNT(*) AS cnt FROM tasks WHERE user_id = ?");
+  mysqli_stmt_bind_param($c1, "i", $user_id); mysqli_stmt_execute($c1);
+  $r1 = mysqli_stmt_get_result($c1); $total = (int) mysqli_fetch_assoc($r1)['cnt'];
+  mysqli_stmt_close($c1);
+
+  $c2 = mysqli_prepare($koneksi, "SELECT COUNT(*) AS cnt FROM tasks WHERE user_id = ? AND status = 'pending'");
+  mysqli_stmt_bind_param($c2, "i", $user_id); mysqli_stmt_execute($c2);
+  $r2 = mysqli_stmt_get_result($c2); $pending = (int) mysqli_fetch_assoc($r2)['cnt'];
+  mysqli_stmt_close($c2);
+
+  $c3 = mysqli_prepare($koneksi, "SELECT COUNT(*) AS cnt FROM tasks WHERE user_id = ? AND status = 'done'");
+  mysqli_stmt_bind_param($c3, "i", $user_id); mysqli_stmt_execute($c3);
+  $r3 = mysqli_stmt_get_result($c3); $done = (int) mysqli_fetch_assoc($r3)['cnt'];
+  mysqli_stmt_close($c3);
+
+  // categories & priorities counts
+  $cc = mysqli_prepare($koneksi, "SELECT COUNT(*) AS cnt FROM categories WHERE user_id = ?");
+  mysqli_stmt_bind_param($cc, "i", $user_id); mysqli_stmt_execute($cc);
+  $rc = mysqli_stmt_get_result($cc); $cats = (int) mysqli_fetch_assoc($rc)['cnt'];
+  mysqli_stmt_close($cc);
+
+  $pc = mysqli_prepare($koneksi, "SELECT COUNT(*) AS cnt FROM priorities WHERE user_id = ?");
+  mysqli_stmt_bind_param($pc, "i", $user_id); mysqli_stmt_execute($pc);
+  $rp = mysqli_stmt_get_result($pc); $prs = (int) mysqli_fetch_assoc($rp)['cnt'];
+  mysqli_stmt_close($pc);
+
+  // recent 5 tasks
+  $recent_q = mysqli_prepare($koneksi, "SELECT id, title, description, status, created_at FROM tasks WHERE user_id = ? ORDER BY created_at DESC LIMIT 5");
+  mysqli_stmt_bind_param($recent_q, "i", $user_id);
+  mysqli_stmt_execute($recent_q);
+  $recent_res = mysqli_stmt_get_result($recent_q);
+  ?>
+
+  <div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="mb-0">Welcome, <?= htmlspecialchars($_SESSION['username']) ?></h2>
+      <div>
+        <a href="tasks.php" class="btn btn-primary">Go to Tasks</a>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-sm-6 col-md-3">
+        <div class="card p-3">
+          <div class="h5 mb-1"><?= $total ?></div>
+          <div class="text-muted small">Total Tasks</div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-md-3">
+        <div class="card p-3">
+          <div class="h5 mb-1"><?= $pending ?></div>
+          <div class="text-muted small">Pending</div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-md-3">
+        <div class="card p-3">
+          <div class="h5 mb-1"><?= $done ?></div>
+          <div class="text-muted small">Done</div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-md-3">
+        <div class="card p-3">
+          <div class="h5 mb-1"><?= $cats ?> / <?= $prs ?></div>
+          <div class="text-muted small">Categories / Priorities</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Recent Tasks</strong>
+        <a href="tasks.php" class="btn btn-sm btn-outline-secondary">View all</a>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>#</th>
+                <th>Title</th>
+                <th>Description</th>
+                <th>Created</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php if (mysqli_num_rows($recent_res) === 0): ?>
+                <tr><td colspan="5" class="text-center py-3 text-muted">No recent tasks.</td></tr>
+              <?php else:
+                $nr = 1;
+                while ($r = mysqli_fetch_assoc($recent_res)): ?>
+                  <tr>
+                    <td><?= $nr++ ?></td>
+                    <td><?= htmlspecialchars($r['title']) ?></td>
+                    <td style="max-width:420px;"><?= htmlspecialchars(mb_strimwidth($r['description'], 0, 80, '...')) ?></td>
+                    <td><?= $r['created_at'] ?></td>
+                    <td>
+                      <?php if ($r['status'] === 'done'): ?>
+                        <span class="badge bg-success">Done</span>
+                      <?php else: ?>
+                        <span class="badge bg-secondary">Pending</span>
+                      <?php endif; ?>
+                    </td>
+                  </tr>
+              <?php
+                endwhile;
+              endif; ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+<?php endif; ?>
+
+<?php include "footer.php"; ?>

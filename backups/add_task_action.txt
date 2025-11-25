@@ -1,0 +1,46 @@
+<?php
+require_once __DIR__ . '/../db.php';
+
+// Check if user is logged in
+if (!isset($_SESSION['user_id'])) {
+    header("Location: /personal_task_system/pages/login.php");
+    exit;
+}
+
+// Only accept POST requests
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header("Location: /personal_task_system/pages/add_task.php");
+    exit;
+}
+
+// Get form data
+$user_id = $_SESSION['user_id'];
+$title = trim($_POST['title'] ?? '');
+$description = trim($_POST['description'] ?? '');
+$category_id = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : 0;
+$priority_id = !empty($_POST['priority_id']) ? (int)$_POST['priority_id'] : 0;
+
+// Validate title
+if ($title === '') {
+    $_SESSION['flash_msg'] = "Please enter a task title";
+    header("Location: /personal_task_system/pages/add_task.php");
+    exit;
+}
+
+// Prepare data for insert
+$category_sql = $category_id > 0 ? $category_id : 'NULL';
+$priority_sql = $priority_id > 0 ? $priority_id : 'NULL';
+$safe_title = mysqli_real_escape_string($koneksi, $title);
+$safe_desc = mysqli_real_escape_string($koneksi, $description);
+
+// Insert new task
+$sql = "INSERT INTO tasks (user_id, category_id, priority_id, title, description)
+        VALUES ($user_id, $category_sql, $priority_sql, '$safe_title', '$safe_desc')";
+
+// Set message and redirect
+$_SESSION['flash_msg'] = mysqli_query($koneksi, $sql)
+    ? "Task created successfully "
+    : "Could not create task";
+
+header("Location: /personal_task_system/pages/tasks.php");
+exit;

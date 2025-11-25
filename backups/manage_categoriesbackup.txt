@@ -1,0 +1,96 @@
+<?php
+include "db.php";
+if (!isset($_SESSION['user_id'])) { 
+    header("Location: login.php"); 
+    exit; 
+}
+$pageTitle = "Manage Categories | Task Manager";
+
+include "header.php";
+
+$user_id = $_SESSION['user_id'];
+$err = "";
+
+// ===== CREATE (tambah kategori) =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_name'])) {
+    $name = trim($_POST['new_name']);
+
+    if ($name === '') {
+        $err = "Nama kategori tidak boleh kosong.";
+    } else {
+        $stmt = mysqli_prepare($koneksi, "INSERT INTO categories (user_id, name) VALUES (?, ?)");
+        mysqli_stmt_bind_param($stmt, "is", $user_id, $name);
+        $ok = mysqli_stmt_execute($stmt);
+        mysqli_stmt_close($stmt);
+
+        if ($ok) {
+            $_SESSION['flash_msg'] = "Kategori berhasil ditambahkan ✅";
+            header("Location: manage_categories.php");
+            exit;
+        } else {
+            $err = "Gagal menambah kategori: " . mysqli_error($koneksi);
+        }
+    }
+}
+
+// ===== DELETE (hapus kategori) =====
+if (isset($_GET['delete'])) {
+    $del_id = intval($_GET['delete']);
+
+    // Pastikan hanya hapus kategori miliknya
+    $dstmt = mysqli_prepare($koneksi, "DELETE FROM categories WHERE id = ? AND user_id = ?");
+    mysqli_stmt_bind_param($dstmt, "ii", $del_id, $user_id);
+    $ok = mysqli_stmt_execute($dstmt);
+    mysqli_stmt_close($dstmt);
+
+    if ($ok) {
+        $_SESSION['flash_msg'] = "Kategori dihapus 🗑️";
+    } else {
+        $_SESSION['flash_msg'] = "Gagal menghapus kategori ❌";
+    }
+    header("Location: manage_categories.php");
+    exit;
+}
+
+// ===== AMBIL SEMUA KATEGORI MILIK USER =====
+$stmt = mysqli_prepare($koneksi, "SELECT id, name, created_at FROM categories WHERE user_id = ? ORDER BY name");
+mysqli_stmt_bind_param($stmt, "i", $user_id);
+mysqli_stmt_execute($stmt);
+$res = mysqli_stmt_get_result($stmt);
+?>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">📂 Manage Categories</h4>
+      <a href="tasks.php" class="btn btn-link">⬅️ Back to Tasks</a>
+    </div>
+
+    <?php if ($err): ?>
+      <div class="alert alert-danger"><?= htmlspecialchars($err) ?></div>
+    <?php endif; ?>
+
+    <form method="POST" class="d-flex gap-2 mb-3">
+      <input name="new_name" class="form-control" placeholder="New category name">
+      <button class="btn btn-primary">Add</button>
+    </form>
+
+    <ul class="list-group">
+      <?php while ($row = mysqli_fetch_assoc($res)): ?>
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <strong><?= htmlspecialchars($row['name']) ?></strong>
+            <div class="text-muted small">Created: <?= $row['created_at'] ?></div>
+          </div>
+          <a href="manage_categories.php?delete=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this category?')">Delete</a>
+        </li>
+      <?php endwhile; ?>
+
+      <?php if (mysqli_num_rows($res) === 0): ?>
+        <li class="list-group-item text-center text-muted">Belum ada kategori</li>
+      <?php endif; ?>
+    </ul>
+  </div>
+</div>
+
+<?php include "footer.php"; ?>

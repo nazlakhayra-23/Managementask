@@ -1,0 +1,44 @@
+<?php
+require_once __DIR__ . '/../db.php';
+
+// Check login
+if (!isset($_SESSION['user_id'])) {
+    header("Location: /personal_task_system/pages/login.php");
+    exit;
+}
+
+// Get form data
+$user_id = $_SESSION['user_id'];
+$task_id = $_POST['id'] ?? 0;
+$title = trim($_POST['title'] ?? '');
+$description = trim($_POST['description'] ?? '');
+$status = $_POST['status'] === 'done' ? 'done' : 'pending';
+$category_id = !empty($_POST['category_id']) ? $_POST['category_id'] : 'NULL';
+$priority_id = !empty($_POST['priority_id']) ? $_POST['priority_id'] : 'NULL';
+
+// Validate title
+if (empty($title)) {
+    $_SESSION['flash_msg'] = "Please enter a task title";
+    header("Location: /personal_task_system/pages/edit_task.php?id=$task_id");
+    exit;
+}
+
+// Update task
+$title = mysqli_real_escape_string($koneksi, $title);
+$description = mysqli_real_escape_string($koneksi, $description);
+
+$sql = "UPDATE tasks 
+        SET title = '$title',
+            description = '$description',
+            status = '$status',
+            category_id = $category_id,
+            priority_id = $priority_id
+        WHERE id = $task_id AND user_id = $user_id";
+
+// Set message and redirect
+$_SESSION['flash_msg'] = mysqli_query($koneksi, $sql) 
+    ? "Task updated successfully" 
+    : "Could not update task";
+
+header("Location: /personal_task_system/pages/tasks.php");
+exit;

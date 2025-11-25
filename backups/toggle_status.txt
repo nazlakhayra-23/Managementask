@@ -1,0 +1,37 @@
+<?php
+// includes/actions/toggle_status.php
+// Ubah status task: dari "pending" ke "done", atau sebaliknya.
+
+require_once __DIR__ . '/../db.php'; // koneksi database + session
+
+// 1) Pastikan user sudah login
+if (!isset($_SESSION['user_id'])) {
+    header("Location: /personal_task_system/pages/login.php");
+    exit;
+}
+
+// 2) Ambil data user & task dari URL
+$user_id = $_SESSION['user_id'];
+$task_id = $_GET['id'] ?? 0;
+
+// 3) Get current task status
+$result = mysqli_query($koneksi, "SELECT status FROM tasks WHERE id = $task_id AND user_id = $user_id");
+$task = mysqli_fetch_assoc($result);
+
+if ($task) {
+    // 4) Toggle status
+    $new_status = ($task['status'] === 'done') ? 'pending' : 'done';
+
+    // 5) Update status
+    mysqli_query($koneksi, "UPDATE tasks SET status = '$new_status' WHERE id = $task_id AND user_id = $user_id");
+
+    // 6) Set success message
+    $_SESSION['flash_msg'] = "Task marked as " . $new_status;
+} else {
+    // 7) Task not found
+    $_SESSION['flash_msg'] = "Task not found";
+}
+
+// 8) Kembali ke halaman tasks
+header("Location: /personal_task_system/pages/tasks.php");
+exit;

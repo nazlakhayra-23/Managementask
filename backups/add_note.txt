@@ -1,0 +1,20 @@
+<?php
+require_once __DIR__ . '/../db.php';
+
+// cek login
+if (!isset($_SESSION['user_id'])) {
+    header("Location: /personal_task_system/pages/login.php");
+    exit;
+}
+
+// ambil input
+$task_id = $_POST['task_id'];
+$note = $_POST['note'];
+
+// tambah note ke database
+$ok = mysqli_query($koneksi, "INSERT INTO personal_notes (task_id, note) VALUES ($task_id, '$note')");
+
+// redirect dengan pesan
+$_SESSION['flash_msg'] = $ok ? "Note added " : "Failed to add note";
+header("Location: /personal_task_system/pages/notes.php?task_id=" . $task_id);
+exit;

@@ -1,0 +1,100 @@
+<?php
+// manage_priorities.php
+include "db.php";
+if (!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
+
+$pageTitle = "Manage Priorities | Task Manager";
+include "header.php";
+
+$user_id = $_SESSION['user_id'];
+$err = "";
+
+// CREATE priority
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['level'])) {
+    $level = trim($_POST['level']);
+    $weight = intval($_POST['weight'] ?? 0);
+
+    if ($level === '') {
+        $err = "Nama prioritas tidak boleh kosong.";
+    } else {
+        $stmt = mysqli_prepare($koneksi, "INSERT INTO priorities (user_id, level, weight) VALUES (?, ?, ?)");
+        mysqli_stmt_bind_param($stmt, "isi", $user_id, $level, $weight);
+        $ok = mysqli_stmt_execute($stmt);
+        mysqli_stmt_close($stmt);
+
+        if ($ok) {
+            $_SESSION['flash_msg'] = "Prioritas berhasil ditambahkan ✅";
+            header("Location: manage_priorities.php");
+            exit;
+        } else {
+            $err = "Gagal menambah prioritas: " . mysqli_error($koneksi);
+        }
+    }
+}
+
+// DELETE priority
+if (isset($_GET['delete'])) {
+    $del_id = intval($_GET['delete']);
+    $dstmt = mysqli_prepare($koneksi, "DELETE FROM priorities WHERE id = ? AND user_id = ?");
+    mysqli_stmt_bind_param($dstmt, "ii", $del_id, $user_id);
+    $ok = mysqli_stmt_execute($dstmt);
+    mysqli_stmt_close($dstmt);
+
+    if ($ok) {
+        $_SESSION['flash_msg'] = "Prioritas dihapus 🗑️";
+    } else {
+        $_SESSION['flash_msg'] = "Gagal menghapus prioritas ❌";
+    }
+    header("Location: manage_priorities.php");
+    exit;
+}
+
+// Ambil daftar priorities user
+$stmt = mysqli_prepare($koneksi, "SELECT id, level, weight, created_at FROM priorities WHERE user_id = ? ORDER BY weight DESC, level ASC");
+mysqli_stmt_bind_param($stmt, "i", $user_id);
+mysqli_stmt_execute($stmt);
+$res = mysqli_stmt_get_result($stmt);
+?>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">⚡ Manage Priorities</h4>
+      <a href="tasks.php" class="btn btn-link">⬅️ Back to Tasks</a>
+    </div>
+
+    <?php if ($err): ?>
+      <div class="alert alert-danger"><?= htmlspecialchars($err) ?></div>
+    <?php endif; ?>
+
+    <form method="POST" class="row g-2 mb-3">
+      <div class="col">
+        <input name="level" class="form-control" placeholder="Priority name (e.g. High)" value="<?= htmlspecialchars($_POST['level'] ?? '') ?>">
+      </div>
+      <div class="col-3">
+        <input name="weight" type="number" class="form-control" placeholder="Weight (higher = more important)" value="<?= htmlspecialchars($_POST['weight'] ?? '0') ?>">
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-primary">Add</button>
+      </div>
+    </form>
+
+    <ul class="list-group">
+      <?php if (mysqli_num_rows($res) === 0): ?>
+        <li class="list-group-item text-center text-muted">Belum ada prioritas</li>
+      <?php endif; ?>
+
+      <?php while ($row = mysqli_fetch_assoc($res)): ?>
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <strong><?= htmlspecialchars($row['level']) ?></strong>
+            <div class="text-muted small">Weight: <?= $row['weight'] ?> • Created: <?= $row['created_at'] ?></div>
+          </div>
+          <a href="manage_priorities.php?delete=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this priority?')">Delete</a>
+        </li>
+      <?php endwhile; ?>
+    </ul>
+  </div>
+</div>
+
+<?php include "footer.php"; ?>

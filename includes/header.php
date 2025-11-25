@@ -1,0 +1,79 @@
+<?php
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- Page Title -->
+  <title><?= htmlspecialchars($pageTitle ?? "Task Manager") ?></title>
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="/personal_task_system/assets/img/favicon.png">
+  
+  <!-- Responsive viewport -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Simple personal task manager built with PHP and MySQL.">
+  
+  <!-- CSS Dependencies -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/personal_task_system/assets/css/style.css" rel="stylesheet">
+</head>
+
+<body>
+<!-- Navigation Bar -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+  <div class="container">
+    <a class="navbar-brand fw-bold" href="/personal_task_system/index.php">Task Management</a>
+    
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto">
+        <?php if (isset($_SESSION['user_id'])): ?>
+          <!-- Logged in menu -->
+          <li class="nav-item"><a class="nav-link" href="/personal_task_system/pages/tasks.php">Tasks</a></li>
+          <li class="nav-item"><a class="nav-link" href="/personal_task_system/pages/manage_categories.php">Categories</a></li>
+          <li class="nav-item"><a class="nav-link" href="/personal_task_system/pages/manage_priorities.php">Priorities</a></li>
+
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+              <?= htmlspecialchars($_SESSION['username']) ?>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item text-danger" href="/personal_task_system/includes/actions/logout.php">Logout</a></li>
+            </ul>
+          </li>
+        <?php else: ?>
+          <!-- Guest menu -->
+          <li class="nav-item"><a class="nav-link" href="/personal_task_system/pages/login.php">Login</a></li>
+          <li class="nav-item"><a class="nav-link" href="/personal_task_system/pages/register.php">Register</a></li>
+        <?php endif; ?>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- Main Content Container -->
+<div class="container my-4">
+<?php
+// Handle flash messages
+if (!empty($_SESSION['flash_msg'])) {
+    $message = $_SESSION['flash_msg'];
+    unset($_SESSION['flash_msg']);
+    echo "<div class='alert alert-success'>$message</div>";
+} 
+elseif (!empty($_COOKIE['flash_msg'])) {
+    $message = $_COOKIE['flash_msg'];
+    setcookie('flash_msg', '', time() - 3600, '/');
+    echo "<div class='alert alert-success'>$message</div>";
+}
+?>
+
+

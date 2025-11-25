@@ -1,0 +1,71 @@
+<?php
+include "db.php";
+
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit;
+}
+
+include "header.php";
+
+$id = $_GET['id'] ?? null;
+if (!$id) {
+    echo "<div class='alert alert-danger'>ID tidak ditemukan.</div>";
+    include "footer.php";
+    exit;
+}
+
+// --- Ambil data tugas berdasarkan ID ---
+$result = mysqli_query($koneksi, "SELECT * FROM tasks WHERE id=$id");
+$task = mysqli_fetch_assoc($result);
+
+if (!$task) {
+    echo "<div class='alert alert-warning'>Tugas tidak ditemukan.</div>";
+    include "footer.php";
+    exit;
+}
+
+// --- Kalau form disubmit (POST) ---
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $title = $_POST['title'];
+    $description = $_POST['description'];
+    $status = $_POST['status'];
+
+    $sql = "UPDATE tasks SET title='$title', description='$description', status='$status' WHERE id=$id";
+    mysqli_query($koneksi, $sql);
+
+    header("Location: tasks.php?msg=" . urlencode("Task berhasil diperbarui"));
+    exit;
+}
+?>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h4 class="card-title mb-4">✏️ Edit Tugas</h4>
+
+    <form method="POST">
+      <div class="mb-3">
+        <label class="form-label">Judul</label>
+        <input type="text" name="title" value="<?= htmlspecialchars($task['title']) ?>" class="form-control" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Deskripsi</label>
+        <textarea name="description" rows="4" class="form-control"><?= htmlspecialchars($task['description']) ?></textarea>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Status</label>
+        <select name="status" class="form-select">
+          <option value="pending" <?= $task['status']=='pending' ? 'selected' : '' ?>>Pending</option>
+          <option value="done" <?= $task['status']=='done' ? 'selected' : '' ?>>Done</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Simpan Perubahan</button>
+      <a href="tasks.php" class="btn btn-link">Batal</a>
+    </form>
+  </div>
+</div>
+
+<?php include "footer.php"; ?>

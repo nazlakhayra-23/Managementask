@@ -1,0 +1,95 @@
+<?php
+include "db.php";
+if (!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
+
+$pageTitle = "Add Tasks | Task Manager";
+include "header.php";
+
+$user_id = $_SESSION['user_id'];
+
+// ambil categories & priorities milik user
+$cats_stmt = mysqli_prepare($koneksi, "SELECT id, name FROM categories WHERE user_id = ? ORDER BY name");
+mysqli_stmt_bind_param($cats_stmt, "i", $user_id);
+mysqli_stmt_execute($cats_stmt);
+$cats_res = mysqli_stmt_get_result($cats_stmt);
+
+$prs_stmt = mysqli_prepare($koneksi, "SELECT id, level FROM priorities WHERE user_id = ? ORDER BY weight DESC");
+mysqli_stmt_bind_param($prs_stmt, "i", $user_id);
+mysqli_stmt_execute($prs_stmt);
+$prs_res = mysqli_stmt_get_result($prs_stmt);
+
+// handle submit
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $title = trim($_POST['title'] ?? '');
+    $description = trim($_POST['description'] ?? '');
+    $category_id = !empty($_POST['category_id']) ? intval($_POST['category_id']) : null;
+    $priority_id = !empty($_POST['priority_id']) ? intval($_POST['priority_id']) : null;
+
+    // simple validation
+    if ($title === '') {
+        $err = "Judul wajib diisi.";
+    } else {
+        $stmt = mysqli_prepare($koneksi, "INSERT INTO tasks (user_id, category_id, priority_id, title, description) VALUES (?, ?, ?, ?, ?)");
+        mysqli_stmt_bind_param($stmt, "iiiss", $user_id, $category_id, $priority_id, $title, $description);
+        $ok = mysqli_stmt_execute($stmt);
+        mysqli_stmt_close($stmt);
+
+        if ($ok) {
+            $_SESSION['flash_msg'] = "Tugas berhasil ditambahkan ✅";
+            header("Location: tasks.php");
+            exit;
+        } else {
+            $err = "Gagal menyimpan tugas: " . mysqli_error($koneksi);
+        }
+    }
+}
+?>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h4 class="card-title mb-4">➕ Add New Tasks</h4>
+
+    <?php if(!empty($err)): ?>
+      <div class="alert alert-danger"><?= htmlspecialchars($err) ?></div>
+    <?php endif; ?>
+
+    <form method="POST">
+      <div class="mb-3">
+        <label class="form-label">Title</label>
+        <input type="text" name="title" class="form-control" required value="<?= htmlspecialchars($_POST['title'] ?? '') ?>">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Description</label>
+        <textarea name="description" rows="4" class="form-control"><?= htmlspecialchars($_POST['description'] ?? '') ?></textarea>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Categories</label>
+        <select name="category_id" class="form-select">
+          <option value="">-- Choose categories (opsional) --</option>
+          <?php while($c = mysqli_fetch_assoc($cats_res)): ?>
+            <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?></option>
+          <?php endwhile; ?>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Priorities</label>
+        <select name="priority_id" class="form-select">
+          <option value="">-- Choose priorities (opsional) --</option>
+          <?php while($p = mysqli_fetch_assoc($prs_res)): ?>
+            <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['level']) ?></option>
+          <?php endwhile; ?>
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-success">
+        <i class="bi bi-plus-circle"></i> Add
+      </button>
+      <a href="tasks.php" class="btn btn-link">Cancel</a>
+    </form>
+  </div>
+</div>
+
+<?php include "footer.php"; ?>
