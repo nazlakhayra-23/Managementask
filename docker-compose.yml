@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile.nginx
     ports:
-      - "1234:80"
+      - "1244:80"
     volumes:
       - .:/var/www/personal_system
     depends_on:
