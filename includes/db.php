@@ -11,7 +11,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // 3) Database credentials — ubah sesuai environment kamu
-$DB_HOST = 'localhost';
+$DB_HOST = 'mysql';
 $DB_USER = 'root';
 $DB_PASS = '';
 $DB_NAME = 'TestProject';
